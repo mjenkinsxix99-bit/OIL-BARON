@@ -1,0 +1,842 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;image-rendering:pixelated}
+  :root{--bg:#1a1a2e;--panel:#16213e;--border:#0f3460;--gold:#f5a623;--gold-d:#c17a0e;--green:#4ade80;--red:#f87171;--cream:#fef3c7;--oil:#0d0d0d;--rust:#c2410c}
+  body,#game{font-family:'Press Start 2P',monospace;background:var(--bg);color:var(--cream)}
+  #game{display:grid;grid-template-columns:190px 1fr 210px;grid-template-rows:48px 1fr 36px;height:640px;border:4px solid var(--gold);box-shadow:0 0 0 2px var(--gold-d),0 0 0 6px #000;overflow:hidden;position:relative}
+  #header{grid-column:1/-1;background:var(--oil);border-bottom:4px solid var(--gold);display:flex;align-items:center;justify-content:space-between;padding:0 10px;gap:8px;z-index:10}
+  #title{font-size:9px;color:var(--gold);letter-spacing:1px}
+  #oil-count{font-size:7px;color:var(--cream)}
+  #oil-count span{color:var(--gold);font-size:9px}
+  #prestige-btn{font-family:'Press Start 2P',monospace;font-size:6px;background:var(--rust);color:var(--cream);border:2px solid var(--red);padding:4px 7px;cursor:pointer;display:none}
+  #prestige-btn:hover{background:var(--red)}
+  #stats-panel{background:var(--panel);border-right:4px solid var(--border);padding:8px;overflow-y:auto;font-size:6px;display:flex;flex-direction:column;gap:5px;z-index:2}
+  .stat-block{border:2px solid var(--border);padding:5px;background:#0a0a1a}
+  .stat-label{color:var(--gold);margin-bottom:2px;font-size:5px}
+  .stat-val{color:var(--green);font-size:6px}
+  #center{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+  #world-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1}
+  #rig-wrap{position:relative;cursor:pointer;user-select:none;transition:transform .05s;z-index:5;flex-shrink:0}
+  #rig-wrap:active{transform:scale(.96)}
+  #ground-strip{width:100%;height:28px;flex-shrink:0;position:relative;z-index:4;background:#5a4020;border-top:4px solid #7a5a28}
+  #ground-grass{position:absolute;top:0;left:0;right:0;height:5px;background:#4a7a20}
+  .click-pop{position:absolute;font-size:7px;color:var(--gold);font-family:'Press Start 2P',monospace;pointer-events:none;animation:popUp .7s ease forwards;white-space:nowrap;z-index:20}
+  @keyframes popUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-40px)}}
+  #hud-overlay{position:absolute;bottom:32px;left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:3px;z-index:6;pointer-events:none}
+  #pump-label{font-size:5px;color:var(--cream);opacity:.7;letter-spacing:1px}
+  #rank-badge{font-size:5px;color:var(--gold);letter-spacing:1px}
+  #xp-bar-wrap{width:80%;max-width:180px;border:2px solid var(--border)}
+  #xp-bar{height:6px;background:var(--gold);width:0%;transition:width .15s}
+  #weather-label{font-size:5px;color:#fff;opacity:.8;background:rgba(0,0,0,.4);padding:2px 6px}
+  #ticker{position:absolute;bottom:4px;left:8px;font-size:5px;color:var(--green);opacity:.8;z-index:7}
+  #upgrades-panel{background:var(--panel);border-left:4px solid var(--border);overflow-y:auto;display:flex;flex-direction:column;z-index:2}
+  #upgrades-title{font-size:6px;color:var(--gold);background:var(--oil);border-bottom:2px solid var(--border);padding:5px 8px;text-align:center}
+  .tab-row{display:flex;border-bottom:2px solid var(--border)}
+  .tab{flex:1;font-family:'Press Start 2P',monospace;font-size:5px;padding:4px 2px;background:var(--oil);border:none;color:#888;cursor:pointer;border-right:1px solid var(--border)}
+  .tab.active{background:var(--panel);color:var(--gold)}
+  #tab-content{flex:1;overflow-y:auto;padding:5px;display:flex;flex-direction:column;gap:4px}
+  .upgrade-btn{font-family:'Press Start 2P',monospace;font-size:5px;background:#0a0a1a;color:var(--cream);border:2px solid var(--border);padding:5px;cursor:pointer;text-align:left;width:100%;line-height:1.6}
+  .upgrade-btn:hover:not(:disabled){border-color:var(--gold);background:#111130}
+  .upgrade-btn:disabled{opacity:.35;cursor:not-allowed}
+  .upgrade-btn .u-name{color:var(--gold);display:block;margin-bottom:2px}
+  .upgrade-btn .u-cost{color:var(--green);display:block}
+  .upgrade-btn .u-owned{color:#888;float:right}
+  .upgrade-btn .u-desc{color:#aaa;display:block;font-size:4px;margin-top:2px;line-height:1.5}
+  #footer{grid-column:1/-1;background:var(--oil);border-top:2px solid var(--border);display:flex;align-items:center;padding:0 12px;font-size:5px;color:#666;z-index:10}
+  #prestige-stars{font-size:7px;color:var(--gold)}
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-track{background:var(--oil)}
+  ::-webkit-scrollbar-thumb{background:var(--border)}
+  #ach-toast{position:absolute;top:0;left:0;right:0;z-index:300;pointer-events:none;display:none}
+  #ach-toast-banner{background:#0a0a0a;border-bottom:3px solid var(--gold);padding:10px 20px;display:flex;align-items:center;justify-content:center;font-size:7px;color:var(--gold);letter-spacing:1px;position:relative}
+  #ach-toast-banner::before{content:'★ ACHIEVEMENT UNLOCKED ★';position:absolute;top:2px;left:0;right:0;font-size:4px;text-align:center;color:var(--gold-d);letter-spacing:3px;opacity:.7}
+  #ach-toast-name{margin-top:6px}
+  #ach-toast-bonus{font-size:5px;color:var(--green);margin-top:3px}
+  #ach-toast-inner{text-align:center}
+  #drip-canvas{display:block;width:100%;height:28px}
+  .ach-card{background:#0a0a1a;border:2px solid var(--border);padding:5px;font-size:5px;line-height:1.7}
+  .ach-card.unlocked{border-color:var(--gold);background:#111100}
+  .ach-card .a-icon{font-size:10px;display:block;margin-bottom:3px}
+  .ach-card .a-name{color:var(--gold);font-size:5px}
+  .ach-card .a-desc{color:#888;font-size:4px}
+  .ach-card .a-bonus{color:var(--green);font-size:4px;margin-top:2px}
+  .ach-card.locked .a-name{color:#555}
+  .ach-card.locked .a-icon{filter:grayscale(1);opacity:.3}
+</style>
+
+<h2 style="position:absolute;left:-9999px">Oil Tycoon Clicker</h2>
+
+<div id="game">
+  <div id="header">
+    <div id="title">⛽ OIL BARON</div>
+    <div id="oil-count">BBL: <span id="barrel-display">0</span> &nbsp;/s: <span id="bps-display">0</span></div>
+    <div id="prestige-stars"></div>
+    <button id="prestige-btn" onclick="prestige()">★ PRESTIGE</button>
+  </div>
+
+  <div id="stats-panel">
+    <div class="stat-block"><div class="stat-label">TOTAL OIL</div><div class="stat-val" id="total-display">0</div></div>
+    <div class="stat-block"><div class="stat-label">PER CLICK</div><div class="stat-val" id="cpc-display">1</div></div>
+    <div class="stat-block"><div class="stat-label">PER SECOND</div><div class="stat-val" id="bps2-display">0</div></div>
+    <div class="stat-block"><div class="stat-label">ACH BONUS</div><div class="stat-val" id="ach-bonus-display">x1.00</div></div>
+    <div class="stat-block"><div class="stat-label">PRESTIGE x</div><div class="stat-val" id="prestige-display">0</div></div>
+    <div class="stat-block"><div class="stat-label">TOTAL MULTI</div><div class="stat-val" id="multi-display">x1.00</div></div>
+    <div class="stat-block"><div class="stat-label">CLICKS</div><div class="stat-val" id="click-count">0</div></div>
+    <div class="stat-block"><div class="stat-label">RANK</div><div class="stat-val" id="rank-display" style="font-size:5px">ROUGHNECK</div></div>
+  </div>
+
+  <div id="center">
+    <canvas id="world-canvas"></canvas>
+    <div id="ach-toast">
+      <div id="ach-toast-banner"><div id="ach-toast-inner"><div id="ach-toast-name"></div><div id="ach-toast-bonus"></div></div></div>
+      <canvas id="drip-canvas"></canvas>
+    </div>
+    <div id="rig-wrap" onclick="clickRig(event)">
+      <svg id="rig-svg" width="150" height="158" viewBox="0 0 150 165" xmlns="http://www.w3.org/2000/svg" style="display:block"></svg>
+    </div>
+    <div id="ground-strip"><div id="ground-grass"></div></div>
+    <div id="hud-overlay">
+      <div id="rank-badge"></div>
+      <div id="pump-label">CLICK TO PUMP</div>
+      <div id="xp-bar-wrap"><div id="xp-bar"></div></div>
+      <div id="weather-label">☀ SUNNY</div>
+    </div>
+    <div id="ticker">► MARKET OPEN | OIL AT $82/bbl</div>
+  </div>
+
+  <div id="upgrades-panel">
+    <div id="upgrades-title">INVESTMENTS</div>
+    <div class="tab-row">
+      <button class="tab active" onclick="switchTab('buildings')">FIELDS</button>
+      <button class="tab" onclick="switchTab('upgrades')">UPGRADES</button>
+      <button class="tab" onclick="switchTab('achievements')">ACHIEV</button>
+    </div>
+    <div id="tab-content"></div>
+  </div>
+
+  <div id="footer"><span id="news-ticker">★ TIP: Click the rig to pump oil!</span></div>
+</div>
+
+<script>
+/* ══════════ WORLD CANVAS ══════════ */
+let WC, WX, wW=0, wH=0, groundY=0;
+let weather='sunny', weatherTimer=0;
+let clouds=[], raindrops=[], tumbleweeds=[], birds=[], lightningBolts=[];
+let sunAngle=0, twSpawnTimer=0, birdSpawnTimer=0, cloudSpawnTimer=0, weatherChangeTimer=0;
+
+const SKY={
+  sunny: {t1:'#1a6fb5',t2:'#7ecef0'},
+  cloudy:{t1:'#556677',t2:'#99aabb'},
+  rainy: {t1:'#334455',t2:'#667788'},
+  stormy:{t1:'#1a2233',t2:'#334455'},
+};
+const GROUND_COL={sunny:'#4a7a20',cloudy:'#3a6018',rainy:'#2a5010',stormy:'#1a3808'};
+const DIRT_COL={sunny:'#5a4a20',cloudy:'#4a3a18',rainy:'#3a2e10',stormy:'#2a2010'};
+
+function pickWeather(){
+  const opts=['sunny','sunny','sunny','cloudy','rainy','stormy'];
+  weather=opts[Math.floor(Math.random()*opts.length)];
+  const labels={sunny:'☀ SUNNY',cloudy:'☁ CLOUDY',rainy:'🌧 RAIN',stormy:'⚡ STORM'};
+  document.getElementById('weather-label').textContent=labels[weather];
+  // refresh cloud density
+  clouds=clouds.slice(0,2);
+  for(let i=clouds.length;i<(weather==='stormy'?8:weather==='rainy'?6:weather==='cloudy'?4:2);i++) addCloud(true);
+}
+
+function addCloud(scatter){
+  const dark=weather==='rainy'||weather==='stormy';
+  clouds.push({
+    x: scatter ? Math.random()*wW : wW+80,
+    y: 10+Math.random()*(wH*0.28),
+    w: 55+Math.random()*75,
+    h: 22+Math.random()*18,
+    spd: dark ? 1.2+Math.random()*1.4 : 0.25+Math.random()*0.5,
+    dark,
+    alpha: dark ? 0.85 : 0.7+Math.random()*0.25,
+  });
+}
+
+function addRaindrops(){
+  const n = weather==='stormy'?8:4;
+  const sx = weather==='stormy'?0.4:0.15;
+  for(let i=0;i<n;i++){
+    raindrops.push({
+      x:Math.random()*wW, y:-8,
+      vx:sx*(3+Math.random()*2), vy:5+Math.random()*5,
+      len:5+Math.random()*8, alpha:0.35+Math.random()*0.4
+    });
+  }
+}
+
+function addTumbleweed(){
+  const left=Math.random()<0.5;
+  const spd=(weather==='stormy'?1.8:0.8)+Math.random()*1.2;
+  tumbleweeds.push({
+    x: left ? wW+30 : -30,
+    y: groundY - 8,
+    r: 8+Math.random()*9,
+    vx: left ? -spd : spd,
+    spin:0, spinSpd:(left?-1:1)*(0.04+Math.random()*0.07),
+    bounce:0, bounceSpd:0.1+Math.random()*0.06,
+  });
+}
+
+function addBird(){
+  if(weather==='stormy') return;
+  const left=Math.random()<0.5;
+  const n=Math.random()<0.35 ? 2+Math.floor(Math.random()*4) : 1;
+  for(let i=0;i<n;i++){
+    birds.push({
+      x:(left?wW+20:-20)+(Math.random()-0.5)*20*i,
+      y:16+Math.random()*(wH*0.42),
+      vx:(left?-1:1)*(0.7+Math.random()*1.1),
+      vy:(Math.random()-0.5)*0.25,
+      wp:Math.random()*Math.PI*2,
+      ws:0.12+Math.random()*0.1,
+      sz:2.5+Math.random()*2.5,
+    });
+  }
+}
+
+function addLightning(){
+  if(weather!=='stormy')return;
+  lightningBolts.push({x:wW*0.15+Math.random()*wW*0.7, life:12});
+}
+
+/* draw helpers */
+function drawSky(){
+  const p=SKY[weather];
+  const g=WX.createLinearGradient(0,0,0,groundY);
+  g.addColorStop(0,p.t1); g.addColorStop(1,p.t2);
+  WX.fillStyle=g; WX.fillRect(0,0,wW,groundY);
+}
+
+function drawSun(){
+  if(weather==='rainy'||weather==='stormy')return;
+  sunAngle+=0.02;
+  const a=weather==='cloudy'?0.18:0.95;
+  const sx=wW-40, sy=28, sr=13;
+  WX.save(); WX.globalAlpha=a;
+  for(let i=0;i<12;i++){
+    const ang=i*(Math.PI/6)+sunAngle*0.3;
+    const rlen=8+Math.sin(sunAngle+i)*3;
+    WX.strokeStyle='#ffd700'; WX.lineWidth=1.5; WX.lineCap='round';
+    WX.beginPath();
+    WX.moveTo(sx+Math.cos(ang)*(sr+3),sy+Math.sin(ang)*(sr+3));
+    WX.lineTo(sx+Math.cos(ang)*(sr+3+rlen),sy+Math.sin(ang)*(sr+3+rlen));
+    WX.stroke();
+  }
+  WX.fillStyle='#ffe033'; WX.beginPath(); WX.arc(sx,sy,sr,0,Math.PI*2); WX.fill();
+  WX.fillStyle='#ffcc00'; WX.beginPath(); WX.arc(sx-2,sy-2,sr-4,0,Math.PI*2); WX.fill();
+  WX.restore();
+}
+
+function drawCloud(c){
+  WX.save(); WX.globalAlpha=c.alpha;
+  const fill=c.dark?'#556677':'#eef6ff';
+  const fill2=c.dark?'#445566':'#d8eeff';
+  WX.fillStyle=fill2;
+  WX.beginPath(); WX.ellipse(c.x,c.y+c.h*.55,c.w*.46,c.h*.42,0,0,Math.PI*2); WX.fill();
+  WX.fillStyle=fill;
+  WX.beginPath(); WX.ellipse(c.x,c.y+c.h*.28,c.w*.36,c.h*.52,0,0,Math.PI*2); WX.fill();
+  WX.beginPath(); WX.ellipse(c.x-c.w*.2,c.y+c.h*.42,c.w*.26,c.h*.36,0,0,Math.PI*2); WX.fill();
+  WX.beginPath(); WX.ellipse(c.x+c.w*.22,c.y+c.h*.4,c.w*.24,c.h*.34,0,0,Math.PI*2); WX.fill();
+  WX.restore();
+}
+
+function drawRaindrop(d){
+  WX.save(); WX.globalAlpha=d.alpha;
+  WX.strokeStyle=weather==='stormy'?'#99ccff':'#88bbdd';
+  WX.lineWidth=1; WX.lineCap='round';
+  WX.beginPath();
+  WX.moveTo(d.x,d.y);
+  WX.lineTo(d.x-d.vx*(d.len/d.vy),d.y-d.len);
+  WX.stroke();
+  WX.restore();
+}
+
+function drawLightningBolt(lb){
+  WX.save(); WX.globalAlpha=lb.life/12;
+  WX.strokeStyle='#ccddff'; WX.lineWidth=1.5; WX.lineCap='round';
+  let lx=lb.x, ly=6;
+  WX.beginPath(); WX.moveTo(lx,ly);
+  for(let i=0;i<7;i++){lx+=(Math.random()-.5)*18; ly+=Math.random()*22; WX.lineTo(lx,ly);}
+  WX.stroke();
+  WX.globalAlpha=(lb.life/12)*0.15;
+  WX.fillStyle='#ffffff'; WX.fillRect(0,0,wW,groundY);
+  WX.restore();
+}
+
+function drawTumbleweed(tw){
+  WX.save();
+  WX.translate(tw.x, tw.y - tw.r - Math.abs(Math.sin(tw.bounce))*5);
+  WX.rotate(tw.spin);
+  WX.globalAlpha=0.85;
+  const r=tw.r;
+  WX.strokeStyle='#9B6914'; WX.lineWidth=1.5;
+  WX.beginPath(); WX.arc(0,0,r,0,Math.PI*2); WX.stroke();
+  WX.lineWidth=1; WX.strokeStyle='#7a5010';
+  for(let i=0;i<6;i++){
+    const a=i*(Math.PI/6);
+    WX.beginPath(); WX.moveTo(Math.cos(a)*r,Math.sin(a)*r); WX.lineTo(Math.cos(a+Math.PI)*r,Math.sin(a+Math.PI)*r); WX.stroke();
+  }
+  WX.strokeStyle='#b07820';
+  for(let i=0;i<4;i++){
+    const a=i*(Math.PI/4);
+    WX.beginPath(); WX.arc(Math.cos(a)*r*.35,Math.sin(a)*r*.35,r*.48,a,a+Math.PI); WX.stroke();
+  }
+  WX.restore();
+}
+
+function drawBird(b){
+  WX.save(); WX.globalAlpha=0.8;
+  const wf=Math.sin(b.wp)*b.sz*1.3;
+  WX.strokeStyle='#111'; WX.lineWidth=1.4; WX.lineCap='round';
+  WX.beginPath(); WX.moveTo(b.x,b.y); WX.quadraticCurveTo(b.x-b.sz*1.1,b.y-wf,b.x-b.sz*2.2,b.y-wf*.4); WX.stroke();
+  WX.beginPath(); WX.moveTo(b.x,b.y); WX.quadraticCurveTo(b.x+b.sz*1.1,b.y-wf,b.x+b.sz*2.2,b.y-wf*.4); WX.stroke();
+  WX.restore();
+}
+
+function drawGround(){
+  WX.fillStyle=DIRT_COL[weather]; WX.fillRect(0,groundY,wW,wH-groundY);
+  WX.fillStyle=GROUND_COL[weather]; WX.fillRect(0,groundY,wW,5);
+  if(weather!=='stormy'){
+    WX.fillStyle='#5a8a28';
+    for(let i=2;i<wW-4;i+=12){
+      const h2=2+Math.abs(Math.sin(i*.5))*3;
+      WX.fillRect(i,groundY-h2,2,h2+1);
+      WX.fillRect(i+5,groundY-2,1,3);
+    }
+  }
+}
+
+/* rain overlay */
+function drawRainOverlay(){
+  if(weather!=='rainy'&&weather!=='stormy')return;
+  const alpha=weather==='stormy'?0.12:0.07;
+  WX.fillStyle=`rgba(100,160,220,${alpha})`;
+  WX.fillRect(0,0,wW,groundY);
+}
+
+let lightTimer=0, lastWeatherChange=0, frameN=0;
+
+function worldFrame(){
+  if(!WX||wW===0){requestAnimationFrame(worldFrame);return;}
+  frameN++;
+  WX.clearRect(0,0,wW,wH);
+
+  drawSky();
+  drawSun();
+
+  /* clouds */
+  cloudSpawnTimer++;
+  const maxClouds=weather==='stormy'?9:weather==='rainy'?7:weather==='cloudy'?5:3;
+  if(cloudSpawnTimer>80&&clouds.length<maxClouds){cloudSpawnTimer=0;addCloud(false);}
+  for(let i=clouds.length-1;i>=0;i--){clouds[i].x-=clouds[i].spd;if(clouds[i].x<-140)clouds.splice(i,1);}
+  clouds.forEach(drawCloud);
+
+  /* rain */
+  if(weather==='rainy'||weather==='stormy'){
+    if(frameN%2===0) addRaindrops();
+    for(let i=raindrops.length-1;i>=0;i--){raindrops[i].x+=raindrops[i].vx;raindrops[i].y+=raindrops[i].vy;if(raindrops[i].y>groundY)raindrops.splice(i,1);}
+    raindrops.forEach(drawRaindrop);
+    drawRainOverlay();
+  } else {raindrops=[];}
+
+  /* lightning */
+  if(weather==='stormy'){
+    lightTimer++;
+    if(lightTimer>100+Math.random()*180){lightTimer=0;addLightning();}
+  }
+  for(let i=lightningBolts.length-1;i>=0;i--){lightningBolts[i].life--;if(lightningBolts[i].life<=0)lightningBolts.splice(i,1);}
+  lightningBolts.forEach(drawLightningBolt);
+
+  /* birds */
+  if(weather!=='stormy'){
+    birdSpawnTimer++;
+    if(birdSpawnTimer>180+Math.random()*160){birdSpawnTimer=0;addBird();}
+  }
+  for(let i=birds.length-1;i>=0;i--){
+    const b=birds[i];
+    b.x+=b.vx; b.y+=b.vy; b.wp+=b.ws;
+    b.y=Math.max(12,Math.min(wH*0.5,b.y));
+    if(b.x<-60||b.x>wW+60)birds.splice(i,1);
+  }
+  birds.forEach(drawBird);
+
+  /* tumbleweeds */
+  twSpawnTimer++;
+  if(twSpawnTimer>220+Math.random()*150&&tumbleweeds.length<3){twSpawnTimer=0;addTumbleweed();}
+  for(let i=tumbleweeds.length-1;i>=0;i--){
+    const tw=tumbleweeds[i];
+    const spd=weather==='stormy'?2:1;
+    tw.x+=tw.vx*spd; tw.spin+=tw.spinSpd*(weather==='stormy'?2.2:1); tw.bounce+=tw.bounceSpd;
+    if(tw.x<-60||tw.x>wW+60)tumbleweeds.splice(i,1);
+  }
+  tumbleweeds.forEach(drawTumbleweed);
+
+  drawGround();
+
+  /* weather change ~every 40s */
+  weatherChangeTimer++;
+  if(weatherChangeTimer>800){weatherChangeTimer=0;pickWeather();}
+
+  requestAnimationFrame(worldFrame);
+}
+
+function initWorld(){
+  WC=document.getElementById('world-canvas');
+  const center=document.getElementById('center');
+  const rect=center.getBoundingClientRect();
+  wW=rect.width||320;
+  wH=rect.height||490;
+  WC.width=wW; WC.height=wH;
+  WX=WC.getContext('2d');
+  groundY=wH-28;
+  pickWeather();
+  for(let i=0;i<4;i++) addCloud(true);
+  addBird();
+  addBird();
+  addTumbleweed();
+  worldFrame();
+}
+
+/* ══════════ RIG SVG BUILDERS ══════════ */
+function rigRoughneck(){return`
+  <polygon points="45,158 60,12 80,12 95,158" fill="#8B5E3C"/>
+  <polygon points="48,158 61,12 67,12 65,158" fill="#A0714A"/>
+  <polygon points="83,158 83,12 89,12 102,158" fill="#A0714A"/>
+  <rect x="52" y="28" width="46" height="7" fill="#6B4226" rx="2"/>
+  <rect x="53" y="52" width="44" height="6" fill="#6B4226" rx="2"/>
+  <rect x="54" y="76" width="42" height="6" fill="#6B4226" rx="2"/>
+  <rect x="55" y="100" width="40" height="5" fill="#6B4226" rx="2"/>
+  <rect x="56" y="122" width="38" height="5" fill="#6B4226" rx="2"/>
+  <line x1="52" y1="28" x2="98" y2="52" stroke="#5a3820" stroke-width="3"/>
+  <line x1="98" y1="28" x2="52" y2="52" stroke="#5a3820" stroke-width="3"/>
+  <line x1="52" y1="76" x2="96" y2="100" stroke="#5a3820" stroke-width="3"/>
+  <rect x="57" y="6" width="36" height="10" fill="#7a5030" rx="2"/>
+  <rect x="68" y="1" width="14" height="8" fill="#8B5E3C" rx="1"/>
+  <circle cx="75" cy="8" r="4" fill="#555" stroke="#888" stroke-width="1"/>
+  <line x1="75" y1="16" x2="75" y2="90" stroke="#aaa" stroke-width="2" stroke-dasharray="4,3"/>
+  <rect x="69" y="90" width="12" height="18" fill="#444" rx="2"/>
+  <rect x="71" y="108" width="8" height="14" fill="#333"/>
+  <rect x="6" y="118" width="34" height="40" fill="#7a5030" rx="1"/>
+  <polygon points="6,118 23,106 40,118" fill="#6B4226"/>
+  <rect x="12" y="126" width="10" height="10" fill="#c8a870" opacity=".5" rx="1"/>
+  <rect x="26" y="129" width="8" height="8" fill="#333"/>
+  <ellipse cx="118" cy="148" rx="14" ry="7" fill="#555"/>
+  <rect x="104" y="141" width="28" height="17" fill="#555" rx="2"/>
+  <ellipse cx="118" cy="141" rx="14" ry="5" fill="#666"/>
+  <rect x="120" y="120" width="4" height="22" fill="#444"/>
+  <ellipse cx="122" cy="119" rx="4" ry="3" fill="#ccc" opacity=".3"/>
+`}
+function rigRoustabout(){return`
+  <polygon points="48,158 63,10 87,10 102,158" fill="#707070"/>
+  <polygon points="51,158 64,10 70,10 68,158" fill="#888"/>
+  <polygon points="80,158 80,10 86,10 99,158" fill="#888"/>
+  <rect x="54" y="24" width="42" height="6" fill="#555" rx="1"/>
+  <rect x="55" y="46" width="40" height="5" fill="#555" rx="1"/>
+  <rect x="56" y="68" width="38" height="5" fill="#555" rx="1"/>
+  <rect x="57" y="90" width="36" height="4" fill="#555" rx="1"/>
+  <rect x="58" y="112" width="34" height="4" fill="#555" rx="1"/>
+  <line x1="54" y1="24" x2="96" y2="46" stroke="#444" stroke-width="2"/>
+  <line x1="96" y1="24" x2="54" y2="46" stroke="#444" stroke-width="2"/>
+  <line x1="55" y1="68" x2="95" y2="90" stroke="#444" stroke-width="2"/>
+  <line x1="95" y1="68" x2="55" y2="90" stroke="#444" stroke-width="2"/>
+  <rect x="59" y="4" width="32" height="10" fill="#666" rx="1"/>
+  <rect x="68" y="0" width="14" height="6" fill="#777" rx="1"/>
+  <ellipse cx="75" cy="152" rx="18" ry="5" fill="#444"/>
+  <ellipse cx="75" cy="150" rx="16" ry="4" fill="#333"/>
+  <rect x="71" y="112" width="8" height="40" fill="#555"/>
+  <rect x="72" y="86" width="6" height="28" fill="#666"/>
+  <rect x="67" y="66" width="16" height="14" fill="#555" rx="2"/>
+  <line x1="75" y1="14" x2="75" y2="66" stroke="#aaa" stroke-width="2"/>
+  <rect x="5" y="114" width="36" height="44" fill="#555" rx="1"/>
+  <rect x="5" y="110" width="36" height="6" fill="#444"/>
+  <rect x="9" y="120" width="10" height="12" fill="#87ceeb" opacity=".4"/>
+  <rect x="23" y="120" width="10" height="12" fill="#87ceeb" opacity=".4"/>
+  <circle cx="23" cy="148" r="8" fill="#333" stroke="#555" stroke-width="2"/>
+  <circle cx="23" cy="148" r="3" fill="#666"/>
+  <rect x="36" y="94" width="6" height="22" fill="#444"/>
+  <ellipse cx="39" cy="93" rx="5" ry="3" fill="#bbb" opacity=".25"/>
+  <ellipse cx="120" cy="140" rx="16" ry="6" fill="#2a3a2a"/>
+  <rect x="104" y="140" width="32" height="18" fill="#2a3a2a" rx="2"/>
+  <ellipse cx="120" cy="158" rx="16" ry="5" fill="#1a2a1a"/>
+`}
+function rigDriller(){return`
+  <polygon points="52,158 65,8 85,8 98,158" fill="#7a8a7a"/>
+  <polygon points="55,158 66,8 72,8 70,158" fill="#909a90"/>
+  <polygon points="78,158 78,8 84,8 96,158" fill="#909a90"/>
+  <rect x="56" y="22" width="38" height="5" fill="#666" rx="1"/>
+  <rect x="57" y="44" width="36" height="4" fill="#666" rx="1"/>
+  <rect x="58" y="66" width="34" height="4" fill="#666" rx="1"/>
+  <rect x="59" y="88" width="32" height="4" fill="#666" rx="1"/>
+  <rect x="60" y="110" width="30" height="4" fill="#666" rx="1"/>
+  <line x1="56" y1="22" x2="94" y2="44" stroke="#555" stroke-width="2"/>
+  <line x1="94" y1="22" x2="56" y2="44" stroke="#555" stroke-width="2"/>
+  <rect x="61" y="2" width="28" height="9" fill="#7a8a7a" rx="1"/>
+  <rect x="65" y="54" width="20" height="16" fill="#555" rx="2"/>
+  <line x1="75" y1="11" x2="75" y2="54" stroke="#ccc" stroke-width="2"/>
+  <ellipse cx="75" cy="152" rx="20" ry="6" fill="#444"/>
+  <ellipse cx="75" cy="150" rx="17" ry="4" fill="#333"/>
+  <rect x="72" y="70" width="6" height="82" fill="#666"/>
+  <rect x="8" y="124" width="28" height="34" fill="#5a6a5a" rx="1"/>
+  <rect x="20" y="112" width="8" height="14" fill="#6a7a6a"/>
+  <rect x="10" y="118" width="40" height="7" fill="#7a6a30" rx="2"/>
+  <circle cx="48" cy="122" r="5" fill="#f5a623"/>
+  <rect x="10" y="125" width="3" height="10" fill="#444"/>
+  <rect x="35" y="125" width="3" height="10" fill="#444"/>
+  <rect x="110" y="122" width="32" height="36" fill="#607060" rx="1"/>
+  <rect x="110" y="118" width="32" height="6" fill="#506050"/>
+  <rect x="114" y="128" width="10" height="10" fill="#87ceeb" opacity=".5"/>
+`}
+function rigToolPusher(){return`
+  <polygon points="50,158 63,6 87,6 100,158" fill="#607080"/>
+  <polygon points="53,158 64,6 70,6 68,158" fill="#7a8a9a"/>
+  <polygon points="80,158 80,6 86,6 97,158" fill="#7a8a9a"/>
+  <rect x="55" y="18" width="40" height="6" fill="#4a5a6a" rx="1"/>
+  <rect x="56" y="40" width="38" height="5" fill="#4a5a6a" rx="1"/>
+  <rect x="57" y="62" width="36" height="5" fill="#4a5a6a" rx="1"/>
+  <rect x="58" y="84" width="34" height="4" fill="#4a5a6a" rx="1"/>
+  <rect x="59" y="106" width="32" height="4" fill="#4a5a6a" rx="1"/>
+  <line x1="55" y1="18" x2="95" y2="40" stroke="#3a4a5a" stroke-width="2"/>
+  <line x1="95" y1="18" x2="55" y2="40" stroke="#3a4a5a" stroke-width="2"/>
+  <line x1="56" y1="62" x2="94" y2="84" stroke="#3a4a5a" stroke-width="2"/>
+  <line x1="94" y1="62" x2="56" y2="84" stroke="#3a4a5a" stroke-width="2"/>
+  <rect x="59" y="0" width="32" height="9" fill="#607080" rx="1"/>
+  <rect x="48" y="124" width="54" height="34" fill="#4a5a6a" rx="1"/>
+  <rect x="48" y="120" width="54" height="6" fill="#3a4a5a"/>
+  <rect x="70" y="108" width="10" height="18" fill="#888"/>
+  <rect x="66" y="114" width="18" height="5" fill="#777" rx="1"/>
+  <rect x="4" y="112" width="40" height="46" fill="#3a4a3a" rx="1"/>
+  <rect x="4" y="108" width="40" height="6" fill="#2a3a2a"/>
+  <rect x="8" y="118" width="12" height="14" fill="#87ceeb" opacity=".35"/>
+  <rect x="24" y="118" width="12" height="14" fill="#87ceeb" opacity=".35"/>
+  <rect x="108" y="116" width="36" height="26" fill="#3a4a3a" rx="2"/>
+  <rect x="108" y="112" width="36" height="6" fill="#2a3a2a"/>
+  <line x1="100" y1="36" x2="128" y2="14" stroke="#555" stroke-width="2"/>
+  <ellipse cx="130" cy="13" rx="5" ry="4" fill="#f97316" opacity=".7"/>
+`}
+function rigOilBaron(){return`
+  <polygon points="49,158 62,4 88,4 101,158" fill="#cc2222"/>
+  <polygon points="49,80 62,4 88,4 101,80" fill="#e8e8e8"/>
+  <polygon points="52,158 63,4 69,4 67,158" fill="#dd3333"/>
+  <polygon points="52,80 63,4 69,4 67,80" fill="#f0f0f0"/>
+  <polygon points="81,158 81,4 87,4 99,158" fill="#dd3333"/>
+  <polygon points="81,80 81,4 87,4 99,80" fill="#f0f0f0"/>
+  <rect x="54" y="16" width="42" height="6" fill="#b01818" rx="1"/>
+  <rect x="55" y="36" width="40" height="5" fill="#b01818" rx="1"/>
+  <rect x="56" y="56" width="38" height="5" fill="#ddd" rx="1"/>
+  <rect x="57" y="76" width="36" height="4" fill="#ddd" rx="1"/>
+  <rect x="58" y="96" width="34" height="4" fill="#cc2222" rx="1"/>
+  <rect x="59" y="116" width="32" height="4" fill="#cc2222" rx="1"/>
+  <line x1="54" y1="16" x2="96" y2="36" stroke="#991111" stroke-width="2"/>
+  <line x1="96" y1="16" x2="54" y2="36" stroke="#991111" stroke-width="2"/>
+  <line x1="56" y1="56" x2="94" y2="76" stroke="#ccc" stroke-width="2"/>
+  <line x1="94" y1="56" x2="56" y2="76" stroke="#ccc" stroke-width="2"/>
+  <rect x="58" y="0" width="34" height="8" fill="#cc2222" rx="1"/>
+  <rect x="66" y="0" width="18" height="5" fill="#fff"/>
+  <rect x="62" y="46" width="26" height="8" fill="#fff" rx="1"/>
+  <rect x="64" y="48" width="22" height="4" fill="#cc2222" rx="1"/>
+  <rect x="45" y="124" width="60" height="34" fill="#3a3a4a" rx="1"/>
+  <rect x="45" y="119" width="60" height="7" fill="#cc2222"/>
+  <rect x="68" y="104" width="14" height="22" fill="#555" rx="1"/>
+  <rect x="64" y="108" width="22" height="5" fill="#666" rx="1"/>
+  <rect x="64" y="116" width="22" height="5" fill="#666" rx="1"/>
+  <rect x="5" y="104" width="36" height="54" fill="#cc2222" rx="1"/>
+  <rect x="5" y="100" width="36" height="6" fill="#991111"/>
+  <rect x="9" y="112" width="12" height="14" fill="#87ceeb" opacity=".5"/>
+  <rect x="25" y="112" width="12" height="14" fill="#87ceeb" opacity=".5"/>
+  <rect x="14" y="130" width="10" height="28" fill="#333"/>
+  <rect x="108" y="110" width="36" height="30" fill="#444" rx="2"/>
+  <rect x="110" y="104" width="32" height="8" fill="#cc2222" rx="1"/>
+  <rect x="108" y="142" width="36" height="5" fill="#cc2222"/>
+  <line x1="101" y1="30" x2="132" y2="10" stroke="#cc2222" stroke-width="2"/>
+  <ellipse cx="133" cy="9" rx="5" ry="4" fill="#f97316" opacity=".8"/>
+`}
+function rigWildcatter(){return`
+  <polygon points="50,158 64,5 86,5 100,158" fill="#4a5a6a"/>
+  <polygon points="53,158 65,5 71,5 69,158" fill="#5a6a7a"/>
+  <polygon points="81,158 81,5 87,5 98,158" fill="#5a6a7a"/>
+  <rect x="55" y="18" width="40" height="5" fill="#3a4a5a" rx="1"/>
+  <rect x="55" y="19" width="40" height="2" fill="#f5a623" opacity=".6"/>
+  <rect x="56" y="40" width="38" height="5" fill="#3a4a5a" rx="1"/>
+  <rect x="56" y="41" width="38" height="2" fill="#f5a623" opacity=".6"/>
+  <rect x="57" y="62" width="36" height="4" fill="#3a4a5a" rx="1"/>
+  <rect x="58" y="84" width="34" height="4" fill="#3a4a5a" rx="1"/>
+  <rect x="59" y="106" width="32" height="4" fill="#3a4a5a" rx="1"/>
+  <line x1="55" y1="18" x2="95" y2="40" stroke="#2a3a4a" stroke-width="2"/>
+  <line x1="95" y1="18" x2="55" y2="40" stroke="#2a3a4a" stroke-width="2"/>
+  <rect x="63" y="28" width="24" height="30" fill="#445566" rx="2"/>
+  <rect x="65" y="30" width="20" height="5" fill="#556677"/>
+  <rect x="58" y="0" width="34" height="10" fill="#4a5a6a" rx="2"/>
+  <rect x="62" y="1" width="26" height="4" fill="#f5a623" opacity=".5"/>
+  <rect x="44" y="122" width="62" height="36" fill="#3a4a5a" rx="1"/>
+  <rect x="44" y="117" width="62" height="7" fill="#2a3a4a"/>
+  <rect x="44" y="114" width="62" height="3" fill="#f5a623" opacity=".7"/>
+  <rect x="44" y="114" width="2" height="12" fill="#f5a623" opacity=".7"/>
+  <rect x="104" y="114" width="2" height="12" fill="#f5a623" opacity=".7"/>
+  <rect x="68" y="102" width="14" height="22" fill="#556" rx="1"/>
+  <rect x="64" y="106" width="22" height="4" fill="#667" rx="1"/>
+  <rect x="64" y="114" width="22" height="4" fill="#667" rx="1"/>
+  <rect x="5" y="100" width="40" height="58" fill="#3a5a3a" rx="2"/>
+  <rect x="5" y="96" width="40" height="6" fill="#2a4a2a"/>
+  <rect x="9" y="104" width="14" height="18" fill="#87ceeb" opacity=".4"/>
+  <rect x="27" y="104" width="14" height="18" fill="#87ceeb" opacity=".4"/>
+  <rect x="9" y="126" width="32" height="28" fill="#1a2a1a" rx="1"/>
+  <rect x="108" y="104" width="36" height="44" fill="#3a4a5a" rx="2"/>
+  <rect x="108" y="100" width="36" height="6" fill="#2a3a4a"/>
+  <rect x="110" y="106" width="32" height="36" fill="#1a1a2a" rx="1"/>
+  <rect x="108" y="122" width="36" height="3" fill="#f5a623" opacity=".6"/>
+  <line x1="100" y1="28" x2="132" y2="8" stroke="#4a5a6a" stroke-width="2"/>
+  <ellipse cx="133" cy="7" rx="5" ry="4" fill="#f97316" opacity=".8"/>
+`}
+function rigTycoon(){return`
+  <polygon points="50,158 64,5 86,5 100,158" fill="#4a5a6a"/>
+  <polygon points="53,158 65,5 71,5 69,158" fill="#5a6a7a"/>
+  <polygon points="81,158 81,5 87,5 98,158" fill="#5a6a7a"/>
+  <rect x="55" y="18" width="40" height="5" fill="#c17a0e" rx="1"/>
+  <rect x="56" y="40" width="38" height="5" fill="#c17a0e" rx="1"/>
+  <rect x="57" y="62" width="36" height="5" fill="#c17a0e" rx="1"/>
+  <rect x="58" y="84" width="34" height="4" fill="#c17a0e" rx="1"/>
+  <rect x="59" y="106" width="32" height="4" fill="#c17a0e" rx="1"/>
+  <line x1="55" y1="18" x2="95" y2="40" stroke="#f5a623" stroke-width="2"/>
+  <line x1="95" y1="18" x2="55" y2="40" stroke="#f5a623" stroke-width="2"/>
+  <line x1="57" y1="62" x2="93" y2="84" stroke="#f5a623" stroke-width="1.5"/>
+  <line x1="93" y1="62" x2="57" y2="84" stroke="#f5a623" stroke-width="1.5"/>
+  <rect x="58" y="0" width="34" height="10" fill="#c17a0e" rx="2"/>
+  <rect x="62" y="1" width="26" height="6" fill="#f5a623" rx="1"/>
+  <rect x="63" y="28" width="24" height="30" fill="#445566" rx="2"/>
+  <rect x="63" y="28" width="24" height="3" fill="#f5a623"/>
+  <rect x="63" y="55" width="24" height="3" fill="#f5a623"/>
+  <rect x="44" y="122" width="62" height="36" fill="#3a4a5a" rx="1"/>
+  <rect x="44" y="117" width="62" height="7" fill="#2a3a4a"/>
+  <rect x="44" y="114" width="62" height="3" fill="#f5a623"/>
+  <rect x="44" y="114" width="2" height="12" fill="#f5a623"/>
+  <rect x="104" y="114" width="2" height="12" fill="#f5a623"/>
+  <rect x="68" y="102" width="14" height="22" fill="#556" rx="1"/>
+  <rect x="64" y="106" width="22" height="4" fill="#c17a0e" rx="1"/>
+  <rect x="64" y="114" width="22" height="4" fill="#c17a0e" rx="1"/>
+  <rect x="64" y="122" width="22" height="3" fill="#f5a623" rx="1"/>
+  <rect x="5" y="100" width="40" height="58" fill="#2a2a1a" rx="2"/>
+  <rect x="5" y="96" width="40" height="6" fill="#c17a0e"/>
+  <rect x="9" y="104" width="14" height="18" fill="#87ceeb" opacity=".4"/>
+  <rect x="27" y="104" width="14" height="18" fill="#87ceeb" opacity=".4"/>
+  <rect x="9" y="126" width="32" height="28" fill="#1a1a08" rx="1"/>
+  <rect x="12" y="128" width="26" height="6" fill="#c17a0e" rx="1"/>
+  <rect x="108" y="104" width="36" height="44" fill="#3a4a5a" rx="2"/>
+  <rect x="108" y="100" width="36" height="6" fill="#c17a0e"/>
+  <rect x="110" y="106" width="32" height="36" fill="#1a1a2a" rx="1"/>
+  <rect x="108" y="122" width="36" height="3" fill="#f5a623"/>
+  <line x1="100" y1="28" x2="132" y2="8" stroke="#c17a0e" stroke-width="2.5"/>
+  <ellipse cx="133" cy="7" rx="6" ry="5" fill="#f97316" opacity=".9"/>
+`}
+function rigMagnate(){return`
+  <rect x="54" y="5" width="42" height="153" fill="#2a3a4a" rx="2"/>
+  <rect x="56" y="7" width="38" height="149" fill="#354555" rx="1"/>
+  <rect x="58" y="20" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="58" y="40" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="58" y="60" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="58" y="80" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="58" y="100" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="58" y="120" width="34" height="4" fill="#2a3a4a"/>
+  <rect x="54" y="5" width="3" height="153" fill="#c17a0e"/>
+  <rect x="93" y="5" width="3" height="153" fill="#c17a0e"/>
+  <rect x="52" y="0" width="46" height="8" fill="#c17a0e" rx="2"/>
+  <rect x="54" y="1" width="42" height="4" fill="#f5a623" rx="1"/>
+  <rect x="62" y="22" width="26" height="35" fill="#3a4a5a" rx="2"/>
+  <rect x="62" y="22" width="26" height="4" fill="#f5a623"/>
+  <rect x="64" y="28" width="22" height="6" fill="#2a3a4a"/>
+  <rect x="64" y="36" width="22" height="6" fill="#2a3a4a"/>
+  <rect x="62" y="53" width="26" height="4" fill="#f5a623"/>
+  <rect x="67" y="124" width="16" height="34" fill="#556" rx="1"/>
+  <rect x="63" y="128" width="24" height="4" fill="#f5a623" rx="1"/>
+  <rect x="63" y="136" width="24" height="4" fill="#c17a0e" rx="1"/>
+  <rect x="63" y="144" width="24" height="4" fill="#f5a623" rx="1"/>
+  <rect x="2" y="92" width="48" height="66" fill="#2a2a1a" rx="2"/>
+  <rect x="2" y="88" width="48" height="6" fill="#c17a0e"/>
+  <rect x="6" y="96" width="16" height="14" fill="#87ceeb" opacity=".5" rx="1"/>
+  <rect x="26" y="96" width="16" height="14" fill="#87ceeb" opacity=".5" rx="1"/>
+  <rect x="6" y="114" width="36" height="14" fill="#87ceeb" opacity=".3" rx="1"/>
+  <rect x="6" y="132" width="14" height="22" fill="#333" rx="1"/>
+  <rect x="24" y="132" width="22" height="22" fill="#1a1a10" rx="1"/>
+  <rect x="10" y="134" width="14" height="8" fill="#c17a0e" rx="1"/>
+  <rect x="100" y="92" width="46" height="66" fill="#2a3a4a" rx="2"/>
+  <rect x="100" y="88" width="46" height="6" fill="#c17a0e"/>
+  <rect x="102" y="94" width="42" height="58" fill="#1a1a2a" rx="1"/>
+  <rect x="104" y="96" width="18" height="20" fill="#223" rx="1"/>
+  <rect x="126" y="96" width="14" height="20" fill="#223" rx="1"/>
+  <rect x="104" y="120" width="36" height="28" fill="#112" rx="1"/>
+  <rect x="104" y="120" width="36" height="3" fill="#f5a623"/>
+  <line x1="96" y1="20" x2="128" y2="2" stroke="#c17a0e" stroke-width="3"/>
+  <ellipse cx="130" cy="1" rx="6" ry="5" fill="#f97316" opacity=".9"/>
+`}
+function rigPetroleumKing(){return`
+  <rect x="10" y="155" width="130" height="4" fill="#c17a0e" rx="1"/>
+  <rect x="14" y="155" width="20" height="4" fill="#f5a623"/>
+  <rect x="40" y="155" width="20" height="4" fill="#f5a623"/>
+  <rect x="66" y="155" width="18" height="4" fill="#f5a623"/>
+  <rect x="90" y="155" width="20" height="4" fill="#f5a623"/>
+  <rect x="116" y="155" width="20" height="4" fill="#f5a623"/>
+  <rect x="58" y="2" width="34" height="157" fill="#c17a0e" rx="3"/>
+  <rect x="61" y="4" width="28" height="153" fill="#d4900e" rx="2"/>
+  <rect x="62" y="4" width="4" height="153" fill="#f5a623" opacity=".6"/>
+  <rect x="83" y="4" width="3" height="153" fill="#9a5a00" opacity=".5"/>
+  <rect x="58" y="20" width="34" height="4" fill="#a06800" rx="1"/>
+  <rect x="58" y="40" width="34" height="4" fill="#a06800" rx="1"/>
+  <rect x="58" y="60" width="34" height="4" fill="#a06800" rx="1"/>
+  <rect x="58" y="80" width="34" height="4" fill="#a06800" rx="1"/>
+  <rect x="58" y="100" width="34" height="4" fill="#a06800" rx="1"/>
+  <rect x="58" y="120" width="34" height="4" fill="#a06800" rx="1"/>
+  <line x1="58" y1="30" x2="20" y2="50" stroke="#f5a623" stroke-width="3"/>
+  <line x1="92" y1="30" x2="130" y2="50" stroke="#f5a623" stroke-width="3"/>
+  <line x1="58" y1="70" x2="28" y2="86" stroke="#c17a0e" stroke-width="2"/>
+  <line x1="92" y1="70" x2="122" y2="86" stroke="#c17a0e" stroke-width="2"/>
+  <rect x="54" y="0" width="42" height="8" fill="#f5a623" rx="3"/>
+  <rect x="57" y="1" width="36" height="4" fill="#ffd700" rx="2"/>
+  <rect x="60" y="18" width="30" height="38" fill="#b87000" rx="3"/>
+  <rect x="62" y="20" width="26" height="6" fill="#ffd700" rx="1"/>
+  <rect x="62" y="28" width="26" height="20" fill="#9a5a00" rx="1"/>
+  <rect x="64" y="30" width="22" height="8" fill="#c17a0e" rx="1"/>
+  <rect x="62" y="50" width="26" height="6" fill="#ffd700" rx="1"/>
+  <rect x="64" y="122" width="22" height="36" fill="#c17a0e" rx="2"/>
+  <rect x="60" y="126" width="30" height="5" fill="#ffd700" rx="1"/>
+  <rect x="60" y="134" width="30" height="5" fill="#ffd700" rx="1"/>
+  <rect x="60" y="142" width="30" height="5" fill="#ffd700" rx="1"/>
+  <rect x="2" y="84" width="52" height="74" fill="#c17a0e" rx="2"/>
+  <rect x="2" y="80" width="52" height="6" fill="#ffd700"/>
+  <rect x="4" y="86" width="48" height="66" fill="#b07000" rx="1"/>
+  <rect x="7" y="90" width="14" height="12" fill="#87ceeb" opacity=".8" rx="1"/>
+  <rect x="25" y="90" width="14" height="12" fill="#87ceeb" opacity=".8" rx="1"/>
+  <rect x="7" y="106" width="14" height="12" fill="#87ceeb" opacity=".6" rx="1"/>
+  <rect x="25" y="106" width="14" height="12" fill="#87ceeb" opacity=".6" rx="1"/>
+  <rect x="7" y="122" width="32" height="24" fill="#87ceeb" opacity=".4" rx="1"/>
+  <rect x="10" y="124" width="26" height="8" fill="#ffd700" rx="1"/>
+  <rect x="96" y="84" width="52" height="74" fill="#c17a0e" rx="2"/>
+  <rect x="96" y="80" width="52" height="6" fill="#ffd700"/>
+  <rect x="98" y="86" width="48" height="66" fill="#b07000" rx="1"/>
+  <rect x="101" y="90" width="16" height="24" fill="#9a5a00" rx="1"/>
+  <rect x="121" y="90" width="16" height="24" fill="#9a5a00" rx="1"/>
+  <circle cx="109" cy="98" r="4" fill="#ffd700" opacity=".7"/>
+  <circle cx="121" cy="98" r="4" fill="#ffd700" opacity=".7"/>
+  <circle cx="133" cy="98" r="4" fill="#ffd700" opacity=".7"/>
+  <rect x="54" y="124" width="8" height="34" fill="#ffd700" rx="1"/>
+  <rect x="88" y="124" width="8" height="34" fill="#ffd700" rx="1"/>
+  <line x1="92" y1="18" x2="128" y2="0" stroke="#ffd700" stroke-width="3"/>
+  <ellipse cx="130" cy="-1" rx="7" ry="6" fill="#f97316" opacity=".9"/>
+  <ellipse cx="130" cy="-3" rx="4" ry="4" fill="#fbbf24" opacity=".8"/>
+`}
+
+const RIG_CONFIGS=[
+  {rank:'ROUGHNECK',    minOil:0,    fn:rigRoughneck,     label:'CA. 1900 — CABLE TOOL'},
+  {rank:'ROUSTABOUT',   minOil:100,  fn:rigRoustabout,    label:'CA. 1920 — STEEL ROTARY'},
+  {rank:'DRILLER',      minOil:1000, fn:rigDriller,       label:'CA. 1950 — PUMP JACK ERA'},
+  {rank:'TOOL PUSHER',  minOil:1e4,  fn:rigToolPusher,    label:'CA. 1970 — SCR ELECTRIC'},
+  {rank:'OIL BARON',    minOil:1e5,  fn:rigOilBaron,      label:'CA. 1980 — RED STEEL'},
+  {rank:'WILDCATTER',   minOil:1e6,  fn:rigWildcatter,    label:'CA. 1990 — MODERN MAST'},
+  {rank:'TYCOON',       minOil:1e7,  fn:rigTycoon,        label:'CA. 1990 — GOLD ACCENTS'},
+  {rank:'MAGNATE',      minOil:1e8,  fn:rigMagnate,       label:'CA. 2000 — ENCLOSED MAST'},
+  {rank:'PETROLEUM KING',minOil:1e9, fn:rigPetroleumKing, label:'FUTURE — FULL GOLD PLATE'},
+];
+let currentRigIdx=-1;
+function updateRig(totalOil){
+  let idx=0;for(let i=0;i<RIG_CONFIGS.length;i++)if(totalOil>=RIG_CONFIGS[i].minOil)idx=i;
+  if(idx===currentRigIdx)return;
+  currentRigIdx=idx;const cfg=RIG_CONFIGS[idx];
+  document.getElementById('rig-svg').innerHTML=cfg.fn();
+  document.getElementById('rank-badge').textContent=cfg.label;
+  document.getElementById('rank-display').textContent=cfg.rank;
+}
+
+/* ══════════ GAME ══════════ */
+const G={oil:0,totalOil:0,perClick:1,prestigeCount:0,prestigeMultiplier:1,clickCount:0,currentTab:'buildings',frameCount:0,achMultiplier:1};
+const BUILDINGS=[
+  {id:'driller',name:'HAND DRILLER',desc:'Your own two hands',base:10,bps:0.1,count:0},
+  {id:'pump',name:'PUMP JACK',desc:'Mechanical arm pumper',base:80,bps:0.5,count:0},
+  {id:'derrick',name:'OIL DERRICK',desc:'Classic wooden tower',base:500,bps:3,count:0},
+  {id:'pipeline',name:'PIPELINE',desc:'Continuous underground flow',base:3000,bps:15,count:0},
+  {id:'refinery',name:'REFINERY',desc:'Process crude at scale',base:15000,bps:60,count:0},
+  {id:'offshore',name:'OFFSHORE RIG',desc:'Drill beneath the sea',base:75000,bps:250,count:0},
+  {id:'corp',name:'OIL CORPORATION',desc:'Global energy empire',base:500000,bps:1000,count:0},
+  {id:'cartel',name:'OPEC SEAT',desc:'Control world supply',base:5000000,bps:6000,count:0},
+];
+const UPGRADES=[
+  {id:'drill_bit',name:'DIAMOND DRILL BIT',desc:'+1 per click',cost:50,bought:false,effect:()=>{G.perClick+=1}},
+  {id:'heavy_crude',name:'HEAVY CRUDE TECH',desc:'Pumps 2x faster',cost:200,bought:false,effect:()=>{BUILDINGS.find(b=>b.id==='pump').bps*=2}},
+  {id:'seismic',name:'SEISMIC SURVEY',desc:'Derricks 2x output',cost:2000,bought:false,effect:()=>{BUILDINGS.find(b=>b.id==='derrick').bps*=2}},
+  {id:'hydraulic',name:'HYDRAULIC FRACTURING',desc:'+5 per click',cost:5000,bought:false,effect:()=>{G.perClick+=5}},
+  {id:'subsea',name:'SUBSEA ROBOT',desc:'Offshore 2x output',cost:80000,bought:false,effect:()=>{BUILDINGS.find(b=>b.id==='offshore').bps*=2}},
+  {id:'algae',name:'OIL ALGAE FARM',desc:'All buildings +25%',cost:300000,bought:false,effect:()=>{BUILDINGS.forEach(b=>b.bps*=1.25)}},
+  {id:'ai_drill',name:'AI DRILLING AI',desc:'+20 per click',cost:800000,bought:false,effect:()=>{G.perClick+=20}},
+  {id:'moon',name:'LUNAR OIL DEPOSIT',desc:'Corps 3x output',cost:5000000,bought:false,effect:()=>{BUILDINGS.find(b=>b.id==='corp').bps*=3}},
+];
+const ACHIEVEMENTS=[
+  {id:'first_click',icon:'⛏',name:'FIRST PUMP',desc:'Click once',check:()=>G.clickCount>=1},
+  {id:'clicks_10',icon:'✊',name:'HARD WORKER',desc:'Click 10 times',check:()=>G.clickCount>=10},
+  {id:'clicks_100',icon:'💪',name:'RELENTLESS',desc:'Click 100 times',check:()=>G.clickCount>=100},
+  {id:'clicks_500',icon:'🦾',name:'IRON FIST',desc:'Click 500 times',check:()=>G.clickCount>=500},
+  {id:'clicks_1000',icon:'🤖',name:'PUMP BOT',desc:'Click 1,000 times',check:()=>G.clickCount>=1000},
+  {id:'oil_100',icon:'🛢',name:'FIRST BARREL',desc:'Collect 100 bbl total',check:()=>G.totalOil>=100},
+  {id:'oil_1k',icon:'🏗',name:'SMALL OPERATION',desc:'Collect 1K bbl total',check:()=>G.totalOil>=1000},
+  {id:'oil_10k',icon:'🏭',name:'GROWING FAST',desc:'Collect 10K bbl total',check:()=>G.totalOil>=10000},
+  {id:'oil_100k',icon:'🚀',name:'BIG LEAGUE',desc:'Collect 100K bbl total',check:()=>G.totalOil>=100000},
+  {id:'oil_1m',icon:'💰',name:'MILLIONAIRE',desc:'Collect 1M bbl total',check:()=>G.totalOil>=1000000},
+  {id:'oil_1b',icon:'🌍',name:'BILLIONAIRE',desc:'Collect 1B bbl total',check:()=>G.totalOil>=1000000000},
+  {id:'buy_pump',icon:'⚙',name:'FIRST MACHINE',desc:'Buy 1 Pump Jack',check:()=>BUILDINGS.find(b=>b.id==='pump').count>=1},
+  {id:'buy_derrick',icon:'🗼',name:'GOING UP',desc:'Buy 1 Derrick',check:()=>BUILDINGS.find(b=>b.id==='derrick').count>=1},
+  {id:'buy_refinery',icon:'🏚',name:'REFINERY BARON',desc:'Buy 1 Refinery',check:()=>BUILDINGS.find(b=>b.id==='refinery').count>=1},
+  {id:'buy_offshore',icon:'🌊',name:'OFFSHORE PIONEER',desc:'Buy 1 Offshore Rig',check:()=>BUILDINGS.find(b=>b.id==='offshore').count>=1},
+  {id:'buy_corp',icon:'🏢',name:'INCORPORATED',desc:'Buy 1 Corporation',check:()=>BUILDINGS.find(b=>b.id==='corp').count>=1},
+  {id:'buy_cartel',icon:'👑',name:'CARTEL BOSS',desc:'Join OPEC',check:()=>BUILDINGS.find(b=>b.id==='cartel').count>=1},
+  {id:'own_10_pumps',icon:'⚙⚙',name:'PUMP FARM',desc:'Own 10 Pump Jacks',check:()=>BUILDINGS.find(b=>b.id==='pump').count>=10},
+  {id:'own_10_derricks',icon:'🗼🗼',name:'DERRICK FOREST',desc:'Own 10 Derricks',check:()=>BUILDINGS.find(b=>b.id==='derrick').count>=10},
+  {id:'bps_10',icon:'⚡',name:'PUMPING FAST',desc:'Reach 10 bbl/s',check:()=>getRawBPS()>=10},
+  {id:'bps_100',icon:'🔥',name:'GUSHER!',desc:'Reach 100 bbl/s',check:()=>getRawBPS()>=100},
+  {id:'bps_1000',icon:'🌋',name:'MEGA FIELD',desc:'Reach 1K bbl/s',check:()=>getRawBPS()>=1000},
+  {id:'first_upgrade',icon:'🔧',name:'UPGRADED',desc:'Buy first upgrade',check:()=>UPGRADES.some(u=>u.bought)},
+  {id:'all_upgrades',icon:'💎',name:'FULLY FITTED',desc:'Buy all upgrades',check:()=>UPGRADES.every(u=>u.bought)},
+  {id:'prestige_1',icon:'★',name:'REBORN',desc:'Prestige once',check:()=>G.prestigeCount>=1},
+  {id:'prestige_3',icon:'★★★',name:'LEGEND',desc:'Prestige 3 times',check:()=>G.prestigeCount>=3},
+  {id:'ach_10',icon:'🏆',name:'ACH HUNTER',desc:'Unlock 10 achievements',check:()=>ACHIEVEMENTS.filter(a=>a.unlocked).length>=10},
+  {id:'ach_20',icon:'👑',name:'COMPLETIONIST',desc:'Unlock 20 achievements',check:()=>ACHIEVEMENTS.filter(a=>a.unlocked).length>=20},
+].map(a=>({...a,unlocked:false,bonus:'x1.01 all output'}));
+const NEWS=['OIL PRICES SURGE ON SUPPLY FEARS','NEW DEPOSIT FOUND IN TEXAS','MARKET HOLDS STEADY AT $82/bbl','OPEC CUTS PRODUCTION BY 500K bpd','HURRICANE THREATENS GULF RIGS','REFINERY STRIKE AVERTED','PIPELINE APPROVAL GRANTED','SHALE BOOM CONTINUES'];
+function fmt(n){if(n>=1e12)return(n/1e12).toFixed(2)+'T';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return Math.floor(n).toString()}
+function getRawBPS(){return BUILDINGS.reduce((s,b)=>s+b.bps*b.count,0)}
+function getTotalMultiplier(){return G.prestigeMultiplier*G.achMultiplier}
+function getBPS(){return getRawBPS()*getTotalMultiplier()}
+function getBuildingCost(b){return Math.floor(b.base*Math.pow(1.15,b.count))}
+
+let drips=[],dripCanvas,dripCtx,dripRAF=null,toastOpacity=0,toastState='hidden',toastTimer=null;
+function initDripCanvas(){dripCanvas=document.getElementById('drip-canvas');dripCtx=dripCanvas.getContext('2d')}
+function spawnDrips(w){drips=[];const n=18+Math.floor(Math.random()*10);for(let i=0;i<n;i++)drips.push({x:4+Math.random()*(w-8),y:0,vy:0.4+Math.random()*1.2,len:6+Math.random()*18,width:2+Math.random()*4,alpha:0.7+Math.random()*0.3,blob:3+Math.random()*5,delay:Math.random()*40,done:false})}
+function drawDrips(ga){if(!dripCtx)return;const w=dripCanvas.width,h=dripCanvas.height;dripCtx.clearRect(0,0,w,h);drips.forEach(d=>{if(d.delay>0){d.delay--;return}if(d.done)return;d.y+=d.vy;d.vy*=1.03;if(d.y>h+d.blob){d.done=true;return}dripCtx.save();dripCtx.globalAlpha=d.alpha*ga;dripCtx.fillStyle='#0a0a0a';dripCtx.strokeStyle='#1a1a0a';dripCtx.lineWidth=d.width;dripCtx.lineCap='round';dripCtx.beginPath();dripCtx.moveTo(d.x,0);dripCtx.lineTo(d.x,d.y);dripCtx.stroke();dripCtx.beginPath();dripCtx.arc(d.x,d.y,d.blob,0,Math.PI*2);dripCtx.fill();dripCtx.restore()})}
+function animateToast(){const banner=document.getElementById('ach-toast-banner');if(toastState==='in'){toastOpacity=Math.min(1,toastOpacity+0.07);banner.style.opacity=toastOpacity;drawDrips(toastOpacity)}else if(toastState==='hold'){drawDrips(1)}else if(toastState==='out'){toastOpacity=Math.max(0,toastOpacity-0.04);banner.style.opacity=toastOpacity;drawDrips(toastOpacity);if(toastOpacity<=0){toastState='hidden';document.getElementById('ach-toast').style.display='none';cancelAnimationFrame(dripRAF);dripRAF=null;return}}dripRAF=requestAnimationFrame(animateToast)}
+function showAchievementToast(a){if(!dripCanvas)initDripCanvas();const toast=document.getElementById('ach-toast');const w=document.getElementById('game').offsetWidth||680;dripCanvas.width=w;dripCanvas.height=28;document.getElementById('ach-toast-name').textContent='★ '+a.name+' ★';document.getElementById('ach-toast-bonus').textContent=a.bonus+' UNLOCKED!';document.getElementById('ach-toast-banner').style.opacity=0;toast.style.display='block';toastOpacity=0;toastState='in';spawnDrips(w);if(toastTimer)clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toastState='out'},3200);if(dripRAF)cancelAnimationFrame(dripRAF);dripRAF=requestAnimationFrame(animateToast)}
+function checkAchievements(){let changed=false;ACHIEVEMENTS.forEach(a=>{if(!a.unlocked&&a.check()){a.unlocked=true;changed=true;showAchievementToast(a)}});if(changed){G.achMultiplier=Math.pow(1.01,ACHIEVEMENTS.filter(a=>a.unlocked).length);if(G.currentTab==='achievements')renderTab()}}
+function clickRig(e){const earned=G.perClick*getTotalMultiplier();G.oil+=earned;G.totalOil+=earned;G.clickCount++;const pop=document.createElement('div');pop.className='click-pop';pop.textContent='+'+fmt(earned)+' bbl';const cx=document.getElementById('center').getBoundingClientRect();pop.style.left=(e.clientX-cx.left-30)+'px';pop.style.top=(e.clientY-cx.top-20)+'px';document.getElementById('center').appendChild(pop);setTimeout(()=>pop.remove(),700);updateRig(G.totalOil);checkAchievements();updateXP();renderAll()}
+function updateXP(){const levels=[0,50,200,500,1000,5000,20000,100000];let lvl=0;for(let i=0;i<levels.length;i++)if(G.totalOil>=levels[i])lvl=i;const next=levels[lvl+1]||levels[lvl]*10,prev=levels[lvl];document.getElementById('xp-bar').style.width=Math.min(100,((G.totalOil-prev)/(next-prev))*100)+'%'}
+function switchTab(tab){G.currentTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['buildings','upgrades','achievements'][i]===tab)});renderTab()}
+function renderTab(){
+  const c=document.getElementById('tab-content');c.innerHTML='';
+  if(G.currentTab==='buildings'){BUILDINGS.forEach(b=>{const cost=getBuildingCost(b);const btn=document.createElement('button');btn.className='upgrade-btn';btn.disabled=G.oil<cost;btn.innerHTML=`<span class="u-name">${b.name}<span class="u-owned">[${b.count}]</span></span><span class="u-cost">🛢${fmt(cost)}</span><span class="u-desc">${b.desc} +${b.bps.toFixed(1)}/s</span>`;btn.onclick=()=>buyBuilding(b);c.appendChild(btn)});}
+  else if(G.currentTab==='upgrades'){let any=false;UPGRADES.forEach(u=>{if(u.bought)return;any=true;const btn=document.createElement('button');btn.className='upgrade-btn';btn.disabled=G.oil<u.cost;btn.innerHTML=`<span class="u-name">${u.name}</span><span class="u-cost">🛢${fmt(u.cost)}</span><span class="u-desc">${u.desc}</span>`;btn.onclick=()=>buyUpgrade(u);c.appendChild(btn)});if(!any)c.innerHTML='<div style="font-size:5px;color:#888;padding:10px;text-align:center">ALL UPGRADES<br>PURCHASED!</div>';}
+  else{const unlocked=ACHIEVEMENTS.filter(a=>a.unlocked).length;const summary=document.createElement('div');summary.style.cssText='font-size:5px;color:var(--gold);padding:4px;text-align:center;border-bottom:1px solid #333;margin-bottom:4px';summary.textContent=unlocked+'/'+ACHIEVEMENTS.length+' | BONUS: x'+G.achMultiplier.toFixed(2);c.appendChild(summary);ACHIEVEMENTS.forEach(a=>{const card=document.createElement('div');card.className='ach-card '+(a.unlocked?'unlocked':'locked');card.innerHTML=`<span class="a-icon">${a.icon}</span><span class="a-name">${a.name}</span><br><span class="a-desc">${a.desc}</span><br><span class="a-bonus">${a.bonus}</span>`;c.appendChild(card)});}
+}
+function buyBuilding(b){const cost=getBuildingCost(b);if(G.oil<cost)return;G.oil-=cost;b.count++;checkAchievements();renderAll()}
+function buyUpgrade(u){if(G.oil<u.cost||u.bought)return;G.oil-=u.cost;u.bought=true;u.effect();checkAchievements();renderAll()}
+function prestige(){if(G.totalOil<1000000)return;G.prestigeCount++;G.prestigeMultiplier=1+G.prestigeCount*0.5;G.oil=0;G.totalOil=0;G.perClick=1;G.clickCount=0;BUILDINGS.forEach(b=>{b.count=0});UPGRADES.forEach(u=>{u.bought=false});checkAchievements();renderAll();document.getElementById('prestige-stars').textContent='★'.repeat(G.prestigeCount)}
+function renderAll(){document.getElementById('barrel-display').textContent=fmt(G.oil);document.getElementById('bps-display').textContent=fmt(getBPS());document.getElementById('total-display').textContent=fmt(G.totalOil);document.getElementById('cpc-display').textContent=fmt(G.perClick*getTotalMultiplier());document.getElementById('bps2-display').textContent=fmt(getBPS());document.getElementById('prestige-display').textContent=G.prestigeCount;document.getElementById('ach-bonus-display').textContent='x'+G.achMultiplier.toFixed(2);document.getElementById('multi-display').textContent='x'+getTotalMultiplier().toFixed(2);document.getElementById('click-count').textContent=fmt(G.clickCount);document.getElementById('prestige-btn').style.display=G.totalOil>=1000000?'block':'none';updateRig(G.totalOil);renderTab();updateXP()}
+let lastTick=Date.now();
+function gameTick(){const now=Date.now(),dt=(now-lastTick)/1000;lastTick=now;const earned=getBPS()*dt;G.oil+=earned;G.totalOil+=earned;G.frameCount++;if(G.frameCount%30===0)checkAchievements();if(G.frameCount%60===0)renderAll();if(G.frameCount%300===0)document.getElementById('news-ticker').textContent='► '+NEWS[Math.floor(Math.random()*NEWS.length)];setTimeout(gameTick,50)}
+
+/* ── BOOT: use setTimeout to guarantee DOM has laid out ── */
+setTimeout(()=>{
+  initWorld();
+  initDripCanvas();
+  updateRig(0);
+  gameTick();
+  renderAll();
+}, 120);
+</script>
